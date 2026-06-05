@@ -283,6 +283,69 @@ def analytics_query_text(df, anomalies, subject_id, research_date):
     return df[mask][cols].reset_index(drop=True)
 
 
+def _plot_bar_profile(data, title, filename, plots_dir):
+    """Горизонтальная гистограмма до/после для одного разреза."""
+    fig, ax = plt.subplots(figsize=(12, max(4, len(data) * 0.4)))
+    x = range(len(data))
+    labels = data.index.tolist()
+    b_vals = data["before"].values / 1e3
+    a_vals = data["after"].values / 1e3
+    ax.barh([i + 0.2 for i in x], b_vals, height=0.35, label="До", color="steelblue")
+    ax.barh([i - 0.2 for i in x], a_vals, height=0.35, label="После", color="orange")
+    ax.set_yticks(list(x))
+    ax.set_yticklabels(labels, fontsize=8)
+    ax.set_xlabel("Weight (в тыс.)")
+    ax.set_title(title)
+    ax.legend()
+    ax.grid(axis="x", linestyle="--", alpha=0.5)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plots_dir, filename), dpi=150)
+    plt.close()
+
+
+def _plot_profile_charts(df, anomalies, plots_dir):
+    """Строит и сохраняет все дополнительные аналитические графики."""
+
+    # Социально-демографические разрезы
+    demo_cols = [
+        ("Пол", "by_gender.png", "До/после по полу"),
+        ("Возраст", "by_age.png", "До/после по возрасту"),
+        ("Регион", "by_region.png", "До/после по региону"),
+        ("Федеральный_округ", "by_fo.png", "До/после по федеральному округу"),
+        ("Количество_детей", "by_children.png", "До/после по количеству детей"),
+        ("Занятость", "by_employment.png", "До/после по занятости"),
+        ("Доход", "by_income.png", "До/после по доходу"),
+    ]
+    for col, fname, title in demo_cols:
+        if col in df.columns:
+            data = analytics_respondent_profile(df, anomalies, col)
+            _plot_bar_profile(data, title, fname, plots_dir)
+
+    # Ресурсные разрезы
+    res_cols = [
+        ("ResourceName", "by_resource.png", "До/после по ресурсу"),
+        ("ResourceType", "by_resource_type.png", "До/после по типу ресурса"),
+        ("Platform", "by_platform.png", "До/после по платформе"),
+        ("UseType", "by_usetype.png", "До/после по типу использования"),
+    ]
+    for col, fname, title in res_cols:
+        if col in df.columns:
+            data = analytics_resource_profile(df, anomalies, col)
+            _plot_bar_profile(data, title, fname, plots_dir)
+
+    # Категориальные разрезы
+    cat_cols = [
+        ("Category1", "by_cat1.png", "До/после по Category1"),
+        ("Category2", "by_cat2.png", "До/после по Category2"),
+        ("Category3", "by_cat3.png", "До/после по Category3"),
+        ("CategoryNameDelivery", "by_cat_delivery.png", "До/после по CategoryDelivery"),
+    ]
+    for col, fname, title in cat_cols:
+        if col in df.columns:
+            data = analytics_respondent_profile(df, anomalies, col)
+            _plot_bar_profile(data, title, fname, plots_dir)
+
+
 def print_summary(anomalies, anomaly_reasons, daily):
     total_resp = daily["SubjectID"].nunique()
     removed_resp = anomalies["SubjectID"].nunique()
@@ -324,27 +387,19 @@ def main():
     anomalies.to_csv(os.path.join(OUTPUT_DIR, "anomalies.csv"), index=False)
     anomaly_reasons.to_csv(os.path.join(OUTPUT_DIR, "anomaly_reasons.csv"), index=False)
 
-    print("[6/7] Построение графиков...")
+    print("[6/7] Построение обязательных графиков...")
     ots_day = compute_ots_by_day(df, anomalies)
     cat_df = compute_category_ots_change(df, anomalies)
     plot_total_ots(ots_day, PLOTS_DIR)
     plot_category_ots_change(cat_df, PLOTS_DIR)
     plot_daily_anomaly_count(anomalies, PLOTS_DIR)
-    print("      Графики сохранены в output/plots/")
+    print("      Три обязательных графика сохранены в output/plots/")
 
-    print("[7/7] Готово.")
+    print("[7/7] Построение дополнительных аналитических графиков...")
+    _plot_profile_charts(df, anomalies, PLOTS_DIR)
+    print("      Дополнительные графики сохранены в output/plots/")
     print()
-    print("Аналитические функции доступны для импорта из solution.py:")
-    print("  analytics_respondent_profile(df, anomalies, 'Пол')")
-    print("  analytics_respondent_profile(df, anomalies, 'Возраст')")
-    print("  analytics_respondent_profile(df, anomalies, 'Регион')")
-    print("  analytics_respondent_profile(df, anomalies, 'Федеральный_округ')")
-    print("  analytics_resource_profile(df, anomalies, 'ResourceName')")
-    print("  analytics_resource_profile(df, anomalies, 'ResourceType')")
-    print("  analytics_resource_profile(df, anomalies, 'Platform')")
-    print("  analytics_resource_profile(df, anomalies, 'UseType')")
-    print("  analytics_brand_ots_by_day(df, anomalies, brand_id)")
-    print("  analytics_query_text(df, anomalies, subject_id, research_date)")
+    print("Готово. Все результаты в папке output/")
 
 
 if __name__ == "__main__":
