@@ -148,9 +148,10 @@ def compute_ots_by_day(df, anomalies):
     cr = _ots_rows(df)
     before = cr.groupby("researchdate")["daily_ots"].sum().rename("ots_before")
     bad = _bad_pairs_set(anomalies)
-    mask = cr.apply(
-        lambda r: (str(r["SubjectID"]), str(r["researchdate"])) not in bad, axis=1
-    )
+    mask = ~pd.Series(
+    list(zip(cr["SubjectID"].astype(str), cr["researchdate"].astype(str))),
+    index=cr.index
+).isin(bad)
     after = cr[mask].groupby("researchdate")["daily_ots"].sum().rename("ots_after")
     result = pd.DataFrame({"ots_before": before, "ots_after": after}).fillna(0)
     result.index = pd.to_datetime(result.index)
@@ -161,9 +162,10 @@ def compute_category_ots_change(df, anomalies):
     cr = _ots_rows(df)
     before = cr.groupby("CategoryNameDelivery")["daily_ots"].sum()
     bad = _bad_pairs_set(anomalies)
-    mask = cr.apply(
-        lambda r: (str(r["SubjectID"]), str(r["researchdate"])) not in bad, axis=1
-    )
+    mask = ~pd.Series(
+    list(zip(cr["SubjectID"].astype(str), cr["researchdate"].astype(str))),
+    index=cr.index
+).isin(bad)
     after = cr[mask].groupby("CategoryNameDelivery")["daily_ots"].sum()
     result = pd.DataFrame({"before": before, "after": after}).dropna()
     result["pct_change"] = (result["after"] - result["before"]) / result["before"] * 100
